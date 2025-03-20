@@ -1,5 +1,5 @@
 import { CameraView } from "expo-camera";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,42 +17,56 @@ export default function CameraScreen() {
   const [recording, setRecording] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState("back");
   const router = useRouter();
   let timer;
 
+  useEffect(() => {
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, []);
+
+  const toggleCameraFacing = () => {
+    if (recording) {
+      Alert.alert("Cannot switch camera", "Stop recording before switching.");
+      return;
+    }
+    setCameraFacing((prev) => (prev === "back" ? "front" : "back"));
+  };
+
   const startRecording = async () => {
-    if (cameraRef.current) {
-      setRecording(true);
-      setRecordTime(0);
+    if (!cameraRef.current) return;
+    
+    setRecording(true);
+    setRecordTime(0);
 
-      timer = setInterval(() => {
-        setRecordTime((prev) => prev + 1);
-      }, 1000);
+    timer = setInterval(() => setRecordTime((prev) => prev + 1), 1000);
 
-      console.log("Starting recording...");
+    try {
       const video = await cameraRef.current.recordAsync();
+      clearInterval(timer);
 
-      clearInterval(timer); // Stop timer
       if (video?.uri) {
-        console.log("Video recorded at:", video.uri);
         await saveVideo(video.uri);
       }
-
+    } catch (error) {
+      console.error("Recording error:", error);
+    } finally {
       setRecording(false);
-      router.back(); // Return to home screen after recording
+      router.back();
     }
   };
 
   const stopRecording = () => {
     if (cameraRef.current) {
-      setShowModal(true); // Show confirmation modal before stopping
+      setShowModal(true); // Show confirmation modal
     }
   };
 
   const confirmStopRecording = () => {
     setShowModal(false);
     if (cameraRef.current) {
-      console.log("Stopping recording...");
       cameraRef.current.stopRecording();
     }
   };
@@ -61,7 +75,6 @@ export default function CameraScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
-        console.log("Media Library permission not granted.");
         Alert.alert(
           "Permission Required",
           "You must allow access to save the video.",
@@ -75,12 +88,10 @@ export default function CameraScreen() {
       let album = await MediaLibrary.getAlbumAsync(albumName);
 
       if (!album) {
-        album = await MediaLibrary.createAlbumAsync(albumName, asset, false);
+        await MediaLibrary.createAlbumAsync(albumName, asset, false);
       } else {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       }
-
-      console.log("Video saved to album:", albumName);
     } catch (error) {
       console.error("Error saving video:", error);
     }
@@ -88,16 +99,16 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        mode="video"
-        facing="back"
-        style={styles.camera}
-      >
+      <CameraView ref={cameraRef} mode="video" facing={cameraFacing} style={styles.camera}>
+        {/* Switch Camera Button */}
+        <TouchableOpacity style={styles.switchCameraButton} onPress={toggleCameraFacing}>
+          <Ionicons name="camera-reverse" size={32} color="white" />
+        </TouchableOpacity>
+
         {/* Recording Timer */}
         {recording && (
           <View style={styles.timerContainer}>
-            <Ionicons name="ios-videocam" size={24} color="red" />
+            <Ionicons name="videocam" size={24} color="red" />
             <Text style={styles.timerText}>{recordTime}s</Text>
           </View>
         )}
@@ -148,8 +159,22 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center" },
-  camera: { flex: 1 },
+  container: { flex: 1 },
+  camera: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+
+  // Switch Camera Button
+  switchCameraButton: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 10,
+    borderRadius: 20,
+  },
 
   // Timer
   timerContainer: {
