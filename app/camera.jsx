@@ -108,8 +108,9 @@ export default function CameraScreen() {
         ref={cameraRef}
         mode="video"
         facing={cameraFacing}
-        style={[styles.camera, { width: screenWidth, height: cameraHeight }]} // Set dynamic width and height
-        resizeMode="cover" // Ensure the camera feed maintains aspect ratio
+        style={[styles.camera, { width: screenWidth, height: cameraHeight }]} 
+        resizeMode="cover" 
+        zoom={0}
       >
         {/* Switch Camera Button */}
         <TouchableOpacity
